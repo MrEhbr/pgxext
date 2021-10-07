@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+ENV_INITIALIZED=false
+
+if [[ -e "$HOME/.profile" ]]; then
+    source "$HOME/.profile"
+    ENV_INITIALIZED=true
+    printf "env initialized with $HOME/.profile\n"
+fi
+
+if [[ -e "$HOME/.bash_profile" && ! $ENV_INITIALIZED ]]; then
+    source "$HOME/.bash_profile"
+    ENV_INITIALIZED=true
+    printf "env initialized with $HOME/.bash_profile\n"
+fi
+
+if [[ -e "$HOME/.zprofile" && ! $ENV_INITIALIZED ]]; then
+    source "$HOME/.zprofile"
+    ENV_INITIALIZED=true
+    printf "env initialized with $HOME/.zprofile\n"
+fi
+
+script_dir=$(dirname $0)
+hook_name=$(basename $0)
+
+hook_dir="$script_dir/$hook_name.d"
+
+if [[ -d $hook_dir ]]; then
+  stdin=$(cat /dev/stdin)
+
+  for hook in $hook_dir/*; do
+    echo "Running $hook_name/$hook hook"
+    echo "$stdin" | $hook "$@"
+
+    exit_code=$?
+
+    if [ $exit_code != 0 ]; then
+      exit $exit_code
+    fi
+  done
+fi
+
+exit 0

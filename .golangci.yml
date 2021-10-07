@@ -1,0 +1,87 @@
+run:
+  deadline: 1m
+  tests: false
+  skip-files:
+    - "testing.go"
+    - ".*\\.pb\\.go"
+    - ".*\\.gen\\.go"
+  skip-dirs:
+    - mocks
+  modules-download-mode: readonly
+
+linters-settings:
+  golint:
+    min-confidence: 0
+  maligned:
+    suggest-new: true
+  goconst:
+    min-len: 5
+    min-occurrences: 4
+  misspell:
+    locale: US
+  exhaustive:
+    check-generated: false
+    default-signifies-exhaustive: true
+  whitespace:
+    multi-if: true
+    multi-func: true
+  nestif:
+    min-complexity: 10
+  revive:
+    # see https://github.com/mgechev/revive#available-rules for details.
+    ignore-generated-header: true
+    severity: warning
+    rules:
+      - name: exported
+        disabled: true
+      - name: var-naming
+        disabled: true
+  gosec:
+    config:
+      G306: "0644"
+
+issues:
+  fix: true
+  exclude:
+    - "`tableName` is unused"
+
+linters:
+  disable-all: true
+  enable:
+    - asciicheck
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - errcheck
+    - exhaustive
+    - exportloopref
+    - goconst
+    - gofumpt
+    - goimports
+    - revive
+    - gomodguard
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - nakedret
+    - nolintlint
+    - prealloc
+    - exportloopref
+    - sqlclosecheck
+    - staticcheck
+    - structcheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+    - dupl
+    - gocognit
+    - gocyclo
+    - misspell
+    - nestif
+    - stylecheck
+    - noctx
