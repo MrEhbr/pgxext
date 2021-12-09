@@ -126,9 +126,10 @@ func TestQuerier(t *testing.T) {
 		t.Fatalf("failed to load time location: %s", err)
 	}
 
+	now := time.Now().Round(time.Second)
 	testRow := row{
-		TimeWithZone: time.Now().In(loc),
-		Time:         time.Now().UTC(),
+		TimeWithZone: now.In(loc),
+		Time:         now.UTC(),
 		Json: foobar{
 			Foo: "foo",
 			Bar: "bar",
