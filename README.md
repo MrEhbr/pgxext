@@ -139,6 +139,58 @@ func main() {
 }
 ```
 
+## Package txdb
+
+ `txdb` is a single transaction based pgxext.Cluster. When the connection is opened, it starts a transaction and all operations performed on this cluster will be within that transaction.
+
+Why is it useful. A very basic use case would be if you want to make functional tests you can prepare a test database and within each test you do not have to reload a database. All tests are isolated within transaction and though, performs fast.
+
+### Usage
+
+```golang
+package txdb
+
+import (
+ "context"
+ "log"
+ "time"
+
+ "github.com/MrEhbr/pgxext/cluster"
+ "github.com/MrEhbr/pgxext/txdb"
+)
+
+func main() {
+ // The first DSN is assumed to be the primary and all
+ // other to be replica
+ dsns := []string{
+  "postgres://user:secret@primary:5432/mydb",
+  "postgres://user:secret@replica-01:5432/mydb",
+  "postgres://user:secret@replica-02:5432/mydb",
+ }
+
+ db, err := cluster.Open(dsns)
+ if err != nil {
+  log.Fatal(err)
+ }
+
+ txdb := txdb.New(db)
+ defer txdb.Close()
+
+ ctx := context.Background()
+ pingCtx, pingCancel := context.WithTimeout(ctx, time.Second)
+ defer pingCancel()
+
+ if err := db.Ping(pingCtx); err != nil {
+  log.Fatalf("Some databases is unreachable: %s", err)
+ }
+
+ _, err = db.Exec(ctx, `INSERT INTO foo(bar) VALUES("baz")`)
+ if err != nil {
+  log.Fatalf("failed to insert: %s", err)
+ }
+}
+```
+
 ## License
 
 © 2020 [Alexey Burmistrov]

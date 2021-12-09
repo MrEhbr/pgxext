@@ -140,7 +140,7 @@ func TestClose(t *testing.T) {
 func Test_replica(t *testing.T) {
 	is := is.New(t)
 
-	db := &cluster{}
+	db := &Cluster{}
 	last := -1
 
 	err := quick.Check(func(n int) bool {

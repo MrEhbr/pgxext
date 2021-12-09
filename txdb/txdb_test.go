@@ -11,7 +11,6 @@ import (
 
 	"github.com/MrEhbr/pgxext/cluster"
 	"github.com/MrEhbr/pgxext/conn"
-	"github.com/georgysavva/scany/pgxscan"
 	"github.com/matryer/is"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
@@ -23,7 +22,7 @@ func TestIntegration_txdb(t *testing.T) {
 	}
 
 	var (
-		db          cluster.Conn
+		db          *cluster.Cluster
 		databaseUrl string
 	)
 	{
@@ -106,7 +105,7 @@ func TestIntegration_txdb(t *testing.T) {
 			t1, t2 := sendBatch(db.Primary().Conn())
 			is.True(!t1.Equal(t2)) // transaction_timestamp not in transaction must be not equal
 
-			txdb := New(db, pgxscan.DefaultAPI)
+			txdb := New(db)
 
 			t1, t2 = sendBatch(txdb.Primary().Conn())
 			is.True(t1.Equal(t2)) // transaction_timestamp in transaction must be equal
@@ -125,7 +124,7 @@ func TestIntegration_txdb(t *testing.T) {
 			t.Parallel()
 			is := is.New(t)
 
-			txdb := New(db, pgxscan.DefaultAPI)
+			txdb := New(db)
 			t.Cleanup(func() {
 				txdb.Rollback(context.Background())
 			})
@@ -157,7 +156,7 @@ func TestIntegration_txdb(t *testing.T) {
 
 			tdb, err := cluster.Open([]string{databaseUrl})
 			is.NoErr(err)
-			txdb := New(tdb, pgxscan.DefaultAPI)
+			txdb := New(tdb)
 
 			t.Cleanup(func() {
 				txdb.Rollback(context.Background())
@@ -186,7 +185,7 @@ func TestIntegration_txdb(t *testing.T) {
 		ctx := context.Background()
 		is := is.New(t)
 
-		txdb := New(db, pgxscan.DefaultAPI)
+		txdb := New(db)
 
 		_, err := db.Exec(ctx, `CREATE TABLE IF NOT EXISTS test_nested(name TEXT)`)
 		is.NoErr(err)

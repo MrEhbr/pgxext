@@ -28,14 +28,14 @@ type (
 	ConnPicker func(db Conn, sql string) conn.Querier
 )
 
-var _ Conn = &cluster{}
+var _ Conn = &Cluster{}
 
 type pdb struct {
 	pool    *pgxpool.Pool
 	querier conn.Querier
 }
 
-type cluster struct {
+type Cluster struct {
 	picker  ConnPicker
 	scanAPI *pgxscan.API
 	pdbs    []*pdb
@@ -45,7 +45,7 @@ type cluster struct {
 // Open concurrently opens each underlying physical db.
 // DSN must be valid according to https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING
 // first being used as the primary and the rest as replica.
-func Open(dsn []string, opts ...Option) (*cluster, error) {
+func Open(dsn []string, opts ...Option) (*Cluster, error) {
 	configs := make([]*pgxpool.Config, len(dsn))
 	for i := range dsn {
 		var err error
@@ -60,7 +60,7 @@ func Open(dsn []string, opts ...Option) (*cluster, error) {
 
 // NewFromConfigs concurrently opens each underlying physical db.
 // first being used as the primary and the rest as replica.
-func NewFromConfigs(config []*pgxpool.Config, opts ...Option) (*cluster, error) {
+func NewFromConfigs(config []*pgxpool.Config, opts ...Option) (*Cluster, error) {
 	clusterOpts := &Options{
 		Picker:  defaultConnPicker,
 		ScanAPI: pgxscan.DefaultAPI,
@@ -70,7 +70,7 @@ func NewFromConfigs(config []*pgxpool.Config, opts ...Option) (*cluster, error) 
 		o(clusterOpts)
 	}
 
-	db := &cluster{
+	db := &Cluster{
 		pdbs:    make([]*pdb, len(config)),
 		picker:  clusterOpts.Picker,
 		scanAPI: clusterOpts.ScanAPI,
@@ -96,7 +96,7 @@ func NewFromConfigs(config []*pgxpool.Config, opts ...Option) (*cluster, error) 
 }
 
 // Close closes all physical databases concurrently, releasing any open resources.
-func (conn *cluster) Close() error {
+func (conn *Cluster) Close() error {
 	return scatter(len(conn.pdbs), func(i int) error {
 		conn.pdbs[i].pool.Close()
 		return nil
@@ -105,7 +105,7 @@ func (conn *cluster) Close() error {
 
 // Ping verifies if a connection to each physical database is still alive,
 // establishing a connection if necessary.
-func (conn *cluster) Ping(ctx context.Context) error {
+func (conn *Cluster) Ping(ctx context.Context) error {
 	return scatter(len(conn.pdbs), func(i int) error {
 		return conn.pdbs[i].pool.Ping(ctx)
 	})
@@ -114,45 +114,45 @@ func (conn *cluster) Ping(ctx context.Context) error {
 // Select multiple records.
 // Select uses a replica by default.
 // See Querier.Select for details.
-func (conn *cluster) Select(ctx context.Context, dst interface{}, sql string, args ...interface{}) error {
+func (conn *Cluster) Select(ctx context.Context, dst interface{}, sql string, args ...interface{}) error {
 	return conn.picker(conn, sql).Select(ctx, dst, sql, args...)
 }
 
 // Get retriave one row.
 // Get uses a replica by default.
 // See Querier.Get for details.
-func (conn *cluster) Get(ctx context.Context, dst interface{}, sql string, args ...interface{}) error {
+func (conn *Cluster) Get(ctx context.Context, dst interface{}, sql string, args ...interface{}) error {
 	return conn.picker(conn, sql).Get(ctx, dst, sql, args...)
 }
 
 // Exec executes a query on primary without returning any rows and return affected rows.
-func (conn *cluster) Exec(ctx context.Context, sql string, args ...interface{}) (int64, error) {
+func (conn *Cluster) Exec(ctx context.Context, sql string, args ...interface{}) (int64, error) {
 	return conn.Primary().Exec(ctx, sql, args...)
 }
 
 // Tx starts a transaction on primary and calls f.
 // See Querier.Tx for details.
-func (conn *cluster) Tx(ctx context.Context, f func(n conn.Querier) error, opts ...conn.TxOption) error {
+func (conn *Cluster) Tx(ctx context.Context, f func(n conn.Querier) error, opts ...conn.TxOption) error {
 	return conn.Primary().Tx(ctx, f, opts...)
 }
 
 // Primary returns the primary physical database
-func (conn *cluster) Primary() conn.Querier {
+func (conn *Cluster) Primary() conn.Querier {
 	return conn.pdbs[0].querier
 }
 
 // Replica returns one of the replica databases.
-func (conn *cluster) Replica() conn.Querier {
+func (conn *Cluster) Replica() conn.Querier {
 	return conn.pdbs[conn.replica(len(conn.pdbs))].querier
 }
 
-func (conn *cluster) replica(n int) int {
+func (conn *Cluster) replica(n int) int {
 	if n <= 1 {
 		return 0
 	}
 	return int(1 + (atomic.AddUint64(&conn.count, 1) % uint64(n-1)))
 }
 
-func (conn *cluster) ScanAPI() *pgxscan.API {
+func (conn *Cluster) ScanAPI() *pgxscan.API {
 	return conn.scanAPI
 }
