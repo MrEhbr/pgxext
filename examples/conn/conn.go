@@ -48,4 +48,24 @@ func main() {
 		_, err = q.Exec(ctx, "UPDATE table SET something = 1")
 		return err
 	}, conn.StatementTimeout(time.Second))
+
+	tx, err := wrapped.Conn(ctx).Begin(ctx)
+	if err != nil {
+		log.Fatalf("failed to start transaction: %s", err)
+	}
+
+	// Put a transaction in the context, so that all subsequent calls use the transaction
+	txCtx := conn.NewTxContext(ctx, tx)
+	if _, err := wrapped.Exec(txCtx, "UPDATE table SET something = 1"); err != nil {
+		_ = tx.Rollback(ctx)
+		log.Fatalf("failed to exec: %s", err)
+	}
+	if err := wrapped.Get(txCtx, &count, "SELECT COUNT(*) FROM table"); err != nil {
+		_ = tx.Rollback(ctx)
+		log.Fatalf("failed to get: %s", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		log.Fatalf("failed to commit transaction: %s", err)
+	}
 }

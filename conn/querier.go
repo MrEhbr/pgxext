@@ -13,7 +13,7 @@ type Querier interface {
 	Get(ctx context.Context, dst interface{}, sql string, args ...interface{}) error
 	Exec(ctx context.Context, sql string, args ...interface{}) (int64, error)
 	Tx(ctx context.Context, f func(q Querier) error, opts ...TxOption) error
-	Conn() PgxConn
+	Conn(ctx context.Context) PgxConn
 }
 
 var _ Querier = &wrappedConn{}
@@ -36,7 +36,7 @@ func WrapConn(conn PgxConn, scanAPI *pgxscan.API) *wrappedConn {
 // Before starting, Select resets the destination slice,
 // so if it's not empty it will overwrite all existing elements.
 func (n *wrappedConn) Select(ctx context.Context, dst interface{}, sql string, args ...interface{}) error {
-	rows, err := n.conn.Query(ctx, sql, args...)
+	rows, err := n.Conn(ctx).Query(ctx, sql, args...)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (n *wrappedConn) Select(ctx context.Context, dst interface{}, sql string, a
 // otherwise it returns an error.
 // It scans data from single row into the destination.
 func (n *wrappedConn) Get(ctx context.Context, dst interface{}, sql string, args ...interface{}) error {
-	rows, err := n.conn.Query(ctx, sql, args...)
+	rows, err := n.Conn(ctx).Query(ctx, sql, args...)
 	if err != nil {
 		return err
 	}
@@ -58,7 +58,7 @@ func (n *wrappedConn) Get(ctx context.Context, dst interface{}, sql string, args
 
 // Exec executes a query without returning any rows and return affected rows.
 func (n *wrappedConn) Exec(ctx context.Context, sql string, args ...interface{}) (int64, error) {
-	res, err := n.conn.Exec(ctx, sql, args...)
+	res, err := n.Conn(ctx).Exec(ctx, sql, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -73,7 +73,7 @@ func (n *wrappedConn) Tx(ctx context.Context, f func(q Querier) error, opts ...T
 	for _, o := range opts {
 		o(txOpts)
 	}
-	err := n.conn.BeginFunc(ctx, func(txx pgx.Tx) error {
+	err := n.Conn(ctx).BeginFunc(ctx, func(txx pgx.Tx) error {
 		if txOpts.TransactionTimeout > 0 {
 			if _, err := txx.Exec(ctx, transactionTimeoutQuery, pgx.QuerySimpleProtocol(true), txOpts.TransactionTimeout); err != nil {
 				return fmt.Errorf("set transaction timeout: %w", err)
@@ -92,6 +92,10 @@ func (n *wrappedConn) Tx(ctx context.Context, f func(q Querier) error, opts ...T
 	return err
 }
 
-func (n *wrappedConn) Conn() PgxConn {
+func (n *wrappedConn) Conn(ctx context.Context) PgxConn {
+	if conn, ok := TxFromContext(ctx); ok {
+		return conn
+	}
+
 	return n.conn
 }

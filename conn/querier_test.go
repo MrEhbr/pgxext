@@ -287,4 +287,27 @@ func TestQuerier(t *testing.T) {
 			is.True(pgErr.Code == "57014")  // 57014 - query_canceled error code
 		})
 	})
+
+	t.Run("Conn", func(t *testing.T) {
+		t.Parallel()
+		querier := WrapConn(db, pgxscan.DefaultAPI)
+
+		t.Run("no transaction in ctx", func(t *testing.T) {
+			is := is.New(t)
+			ctx := context.Background()
+
+			conn := querier.Conn(ctx)
+			is.True(conn == db) // must be original database connection
+		})
+
+		t.Run("transaction in ctx", func(t *testing.T) {
+			is := is.New(t)
+			ctx := context.Background()
+			tx, err := querier.Conn(ctx).Begin(ctx)
+			is.NoErr(err)
+			ctx = NewTxContext(ctx, tx)
+			conn := querier.Conn(ctx)
+			is.True(conn == tx) // must be transaction connection
+		})
+	})
 }

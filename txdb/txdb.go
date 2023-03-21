@@ -132,7 +132,7 @@ func (c *txdbCluster) Replica() conn.Querier {
 
 func (c *txdbCluster) beginOnce(ctx context.Context) (pgx.Tx, error) {
 	if c.tx == nil {
-		tx, err := c.cluster.Primary().Conn().Begin(ctx)
+		tx, err := c.cluster.Primary().Conn(ctx).Begin(ctx)
 		if err != nil {
 			return nil, err
 		}
