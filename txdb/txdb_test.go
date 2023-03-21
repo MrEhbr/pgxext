@@ -102,12 +102,12 @@ func TestIntegration_txdb(t *testing.T) {
 			t.Parallel()
 			is := is.New(t)
 
-			t1, t2 := sendBatch(db.Primary().Conn())
+			t1, t2 := sendBatch(db.Primary().Conn(ctx))
 			is.True(!t1.Equal(t2)) // transaction_timestamp not in transaction must be not equal
 
 			txdb := New(db)
 
-			t1, t2 = sendBatch(txdb.Primary().Conn())
+			t1, t2 = sendBatch(txdb.Primary().Conn(ctx))
 			is.True(t1.Equal(t2)) // transaction_timestamp in transaction must be equal
 		})
 	})

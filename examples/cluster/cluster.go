@@ -48,7 +48,7 @@ func main() {
 	}
 
 	// If needed, one can access the PgxConn to call pgx methods directly such as SendBatch, CopyFrom ... .
-	conn := db.Primary().Conn()
+	conn := db.Primary().Conn(ctx)
 	_ = conn
 	// If needed, one can access the primary or a replica explicitly.
 	primary, replica := db.Primary(), db.Replica()

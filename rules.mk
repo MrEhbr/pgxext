@@ -166,7 +166,7 @@ go.bumpdeps:
 go.fmt:
 	@set -e; for dir in $(GOMOD_DIRS); do ( set -e; \
 	  cd $$dir; \
-	  $(GO) run mvdan.cc/gofumpt -extra -w -l -s `go list -f '{{.Dir}}' $(WHAT) | grep -v mocks` \
+	  $(GO) run mvdan.cc/gofumpt -extra -w -l `go list -f '{{.Dir}}' $(WHAT) | grep -v mocks` \
 	); done
 
 VERIFY_STEPS += go.depaware-check
