@@ -3,14 +3,13 @@ module github.com/MrEhbr/pgxext
 go 1.24.2
 
 require (
-	github.com/georgysavva/scany v1.2.3
+	github.com/georgysavva/scany/v2 v2.1.3
 	github.com/golangci/golangci-lint v1.64.8
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/jackc/pgconn v1.14.3
 	github.com/jackc/pgmock v0.0.0-20210724152146-4ad1a8207f65
-	github.com/jackc/pgproto3/v2 v2.3.3
-	github.com/jackc/pgx/v4 v4.18.3
+	github.com/jackc/pgproto3/v2 v2.1.1
+	github.com/jackc/pgx/v5 v5.7.2
 	github.com/matryer/is v1.4.1
 	github.com/ory/dockertest/v3 v3.12.0
 	mvdan.cc/gofumpt v0.8.0
@@ -107,11 +106,11 @@ require (
 	github.com/hexops/gotextdiff v1.0.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
+	github.com/jackc/pgconn v1.9.1-0.20210724152538-d89c8390a530 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
-	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
-	github.com/jackc/pgtype v1.14.0 // indirect
-	github.com/jackc/puddle v1.3.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jgautheron/goconst v1.7.1 // indirect
 	github.com/jingyugao/rowserrcheck v1.1.1 // indirect
 	github.com/jjti/go-spancheck v0.6.4 // indirect

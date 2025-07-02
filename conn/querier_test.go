@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/georgysavva/scany/pgxscan"
+	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/matryer/is"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
@@ -68,7 +68,7 @@ func TestQuerier(t *testing.T) {
 		// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
 		pool.MaxWait = 120 * time.Second
 		if err = pool.Retry(func() error {
-			db, err = pgxpool.Connect(t.Context(), databaseDSN)
+			db, err = pgxpool.New(t.Context(), databaseDSN)
 			if err != nil {
 				return err
 			}
@@ -256,7 +256,7 @@ func TestQuerier(t *testing.T) {
 			err := querier.Tx(t.Context(), func(_ Querier) error {
 				time.Sleep(100 * time.Millisecond)
 				return nil
-			}, TransactionTimeout(50*time.Millisecond))
+			}, TransactionTimeout(10*time.Millisecond))
 
 			is.True(err != nil) // timeout idle error
 			var pgErr *pgconn.PgError

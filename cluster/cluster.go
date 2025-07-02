@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 
 	"github.com/MrEhbr/pgxext/conn"
-	"github.com/georgysavva/scany/pgxscan"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type (
@@ -77,7 +77,7 @@ func NewFromConfigs(config []*pgxpool.Config, opts ...Option) (*Cluster, error) 
 	}
 
 	err := scatter(len(db.pdbs), func(i int) error {
-		c, err := pgxpool.ConnectConfig(context.Background(), config[i])
+		c, err := pgxpool.NewWithConfig(context.Background(), config[i])
 		if err != nil {
 			return err
 		}

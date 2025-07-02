@@ -13,11 +13,11 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/jackc/pgmock"
 	"github.com/jackc/pgproto3/v2"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/matryer/is"
 )
 
-func testDatabase(t testing.TB, steps ...pgmock.Step) (string, func() error) {
+func testDatabase(t testing.TB, steps ...pgmock.Step) string {
 	script := &pgmock.Script{
 		Steps: append(
 			[]pgmock.Step{
@@ -44,10 +44,7 @@ func testDatabase(t testing.TB, steps ...pgmock.Step) (string, func() error) {
 		t.Fatal(err)
 	}
 
-	serverErrChan := make(chan error, 1)
-	go func() {
-		defer close(serverErrChan)
-
+	go func(ln net.Listener) {
 		conn, acceptErr := ln.Accept()
 		if acceptErr != nil {
 			t.Fatal(acceptErr)
@@ -63,14 +60,16 @@ func testDatabase(t testing.TB, steps ...pgmock.Step) (string, func() error) {
 		if err != nil && !errors.Is(err, os.ErrDeadlineExceeded) {
 			t.Fatal(err)
 		}
-	}()
+
+		ln.Close() // close listener after script is done
+	}(ln)
 
 	parts := strings.Split(ln.Addr().String(), ":")
 	return fmt.Sprintf(
 		"sslmode=disable prefer_simple_protocol=true host=%s port=%s",
 		parts[0],
 		parts[1],
-	), ln.Close
+	)
 }
 
 func TestOpen(t *testing.T) {
@@ -78,24 +77,18 @@ func TestOpen(t *testing.T) {
 		is := is.New(t)
 		db, err := Open([]string{"host=127.0.0.1", "host=127.0.0.2", "foobar"})
 
-		is.True(
-			err != nil,
-		) // expcect error when one config is invalid
+		is.True(err != nil)                               // expcect error when one config is invalid
 		is.True(strings.Contains(err.Error(), "index 3")) // there must config index in error
 		is.True(db == nil)                                // db must be nil
 	})
 	t.Run("multiple configs", func(t *testing.T) {
 		is := is.New(t)
 
-		one, oneClose := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
-		defer oneClose()
-		two, twoClose := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
-		defer twoClose()
-		three, threeClose := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
-		defer threeClose()
+		one := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
+		two := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
+		three := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
 		db, err := Open([]string{one, two, three})
 		is.NoErr(err)
-		defer db.Close()
 
 		is.Equal(len(db.pdbs), 3) // must be 3 connections
 	})
@@ -110,12 +103,9 @@ func TestNewFromConfigs(t *testing.T) {
 	t.Run("multiple configs", func(t *testing.T) {
 		is := is.New(t)
 
-		one, oneClose := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
-		defer oneClose()
-		two, twoClose := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
-		defer twoClose()
-		three, threeClose := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
-		defer threeClose()
+		one := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
+		two := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
+		three := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
 		db, err := NewFromConfigs([]*pgxpool.Config{fn(one), fn(two), fn(three)})
 		is.NoErr(err)
 		defer db.Close()
@@ -128,12 +118,9 @@ func TestClose(t *testing.T) {
 	t.Run("positive", func(t *testing.T) {
 		is := is.New(t)
 
-		one, oneClose := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
-		defer oneClose()
-		two, twoClose := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
-		defer twoClose()
-		three, threeClose := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
-		defer threeClose()
+		one := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
+		two := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
+		three := testDatabase(t, pgmock.ExpectMessage(&pgproto3.Terminate{}))
 		db, err := Open([]string{one, two, three})
 		is.NoErr(err)
 

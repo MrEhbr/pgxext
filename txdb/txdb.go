@@ -7,8 +7,8 @@ import (
 
 	"github.com/MrEhbr/pgxext/cluster"
 	"github.com/MrEhbr/pgxext/conn"
-	"github.com/georgysavva/scany/pgxscan"
-	"github.com/jackc/pgx/v4"
+	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5"
 )
 
 var (

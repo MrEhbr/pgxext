@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/georgysavva/scany/pgxscan"
-	"github.com/jackc/pgx/v4"
+	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5"
 )
 
 type Querier interface {
@@ -73,15 +73,15 @@ func (n *wrappedConn) Tx(ctx context.Context, f func(q Querier) error, opts ...T
 	for _, o := range opts {
 		o(txOpts)
 	}
-	err := n.Conn(ctx).BeginFunc(ctx, func(txx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, n.Conn(ctx), func(txx pgx.Tx) error {
 		if txOpts.TransactionTimeout > 0 {
-			if _, err := txx.Exec(ctx, transactionTimeoutQuery, pgx.QuerySimpleProtocol(true), txOpts.TransactionTimeout); err != nil {
+			if _, err := txx.Exec(ctx, transactionTimeoutQuery, pgx.QueryExecModeSimpleProtocol, txOpts.TransactionTimeout); err != nil {
 				return fmt.Errorf("set transaction timeout: %w", err)
 			}
 		}
 
 		if txOpts.StatementTimeout > 0 {
-			if _, err := txx.Exec(ctx, statementTimeoutQuery, pgx.QuerySimpleProtocol(true), txOpts.StatementTimeout); err != nil {
+			if _, err := txx.Exec(ctx, statementTimeoutQuery, pgx.QueryExecModeSimpleProtocol, txOpts.StatementTimeout); err != nil {
 				return fmt.Errorf("set statement timeout: %w", err)
 			}
 		}

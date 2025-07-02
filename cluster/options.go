@@ -1,6 +1,6 @@
 package cluster
 
-import "github.com/georgysavva/scany/pgxscan"
+import "github.com/georgysavva/scany/v2/pgxscan"
 
 // Options for cluster.
 type Options struct {

@@ -7,15 +7,15 @@ import (
 	"time"
 
 	"github.com/MrEhbr/pgxext/conn"
-	"github.com/georgysavva/scany/pgxscan"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	ctx := context.Background()
-	db, err := pgxpool.Connect(ctx, "postgres://user:secret@host:5432/mydb")
+	db, err := pgxpool.New(ctx, "postgres://user:secret@host:5432/mydb")
 	if err != nil {
 		logger.Error("failed to connect to database", "error", err)
 		os.Exit(1)
