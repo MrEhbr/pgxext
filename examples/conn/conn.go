@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/MrEhbr/pgxext/conn"
@@ -11,17 +12,21 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
 	ctx := context.Background()
 	db, err := pgxpool.Connect(ctx, "postgres://user:secret@host:5432/mydb")
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 
 	pingCtx, pingCancel := context.WithTimeout(ctx, time.Second)
-	defer pingCancel()
 
-	if err := db.Ping(pingCtx); err != nil {
-		log.Fatalf("Database is unreachable: %s", err)
+	if pingErr := db.Ping(pingCtx); pingErr != nil {
+		logger.Error("Database is unreachable", "error", pingErr)
+		pingCancel()
+		os.Exit(1)
 	}
 
 	wrapped := conn.WrapConn(db, pgxscan.DefaultAPI)
@@ -29,18 +34,21 @@ func main() {
 	var count int
 	err = wrapped.Get(ctx, &count, "SELECT COUNT(*) FROM table")
 	if err != nil {
-		log.Fatalf("failed to get: %s", err)
+		logger.Error("failed to get", "error", err)
+		os.Exit(1)
 	}
 
 	var rows []string
 	err = wrapped.Select(ctx, &rows, "SELECT something FROM table")
 	if err != nil {
-		log.Fatalf("failed to select: %s", err)
+		logger.Error("failed to select", "error", err)
+		os.Exit(1)
 	}
 
 	_, err = wrapped.Exec(ctx, "UPDATE table SET something = 1")
 	if err != nil {
-		log.Fatalf("failed to update: %s", err)
+		logger.Error("failed to update", "error", err)
+		os.Exit(1)
 	}
 
 	// Transaction will be canceled if update took to long
@@ -51,21 +59,25 @@ func main() {
 
 	tx, err := wrapped.Conn(ctx).Begin(ctx)
 	if err != nil {
-		log.Fatalf("failed to start transaction: %s", err)
+		logger.Error("failed to start transaction", "error", err)
+		os.Exit(1)
 	}
 
 	// Put a transaction in the context, so that all subsequent calls use the transaction
 	txCtx := conn.NewTxContext(ctx, tx)
-	if _, err := wrapped.Exec(txCtx, "UPDATE table SET something = 1"); err != nil {
+	if _, execErr := wrapped.Exec(txCtx, "UPDATE table SET something = 1"); execErr != nil {
 		_ = tx.Rollback(ctx)
-		log.Fatalf("failed to exec: %s", err)
+		logger.Error("failed to exec", "error", execErr)
+		os.Exit(1)
 	}
-	if err := wrapped.Get(txCtx, &count, "SELECT COUNT(*) FROM table"); err != nil {
+	if getErr := wrapped.Get(txCtx, &count, "SELECT COUNT(*) FROM table"); getErr != nil {
 		_ = tx.Rollback(ctx)
-		log.Fatalf("failed to get: %s", err)
+		logger.Error("failed to get", "error", getErr)
+		os.Exit(1)
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		log.Fatalf("failed to commit transaction: %s", err)
+	if commitErr := tx.Commit(ctx); commitErr != nil {
+		logger.Error("failed to commit transaction", "error", commitErr)
+		os.Exit(1)
 	}
 }

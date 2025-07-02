@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"testing"
@@ -24,8 +25,8 @@ func TestScatter(t *testing.T) {
 		if err == nil {
 			t.Fatal("Expected error, got nil")
 		}
-		errs, ok := err.(*multierror.Error)
-		if !ok {
+		var errs *multierror.Error
+		if !errors.As(err, &errs) {
 			t.Fatalf("Expect multierror, got %+v", err)
 		}
 

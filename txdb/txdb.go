@@ -34,7 +34,7 @@ func New(cluster *cluster.Cluster) *txdbCluster {
 	return &txdbCluster{cluster: cluster, scanAPI: cluster.ScanAPI()}
 }
 
-// Close rollback current transaction and close physical connection
+// Close rollback current transaction and close physical connection.
 func (c *txdbCluster) Close() error {
 	if err := c.Rollback(context.Background()); err != nil {
 		return err

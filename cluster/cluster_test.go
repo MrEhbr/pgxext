@@ -1,7 +1,6 @@
 package cluster
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -22,10 +21,19 @@ func testDatabase(t testing.TB, steps ...pgmock.Step) (string, func() error) {
 	script := &pgmock.Script{
 		Steps: append(
 			[]pgmock.Step{
-				pgmock.ExpectAnyMessage(&pgproto3.StartupMessage{ProtocolVersion: pgproto3.ProtocolVersionNumber, Parameters: map[string]string{}}),
+				pgmock.ExpectAnyMessage(
+					&pgproto3.StartupMessage{
+						ProtocolVersion: pgproto3.ProtocolVersionNumber,
+						Parameters:      map[string]string{},
+					},
+				),
 				pgmock.SendMessage(&pgproto3.AuthenticationOk{}),
-				pgmock.SendMessage(&pgproto3.ParameterStatus{Name: "client_encoding", Value: "UTF8"}),
-				pgmock.SendMessage(&pgproto3.ParameterStatus{Name: "standard_conforming_strings", Value: "on"}),
+				pgmock.SendMessage(
+					&pgproto3.ParameterStatus{Name: "client_encoding", Value: "UTF8"},
+				),
+				pgmock.SendMessage(
+					&pgproto3.ParameterStatus{Name: "standard_conforming_strings", Value: "on"},
+				),
 				pgmock.SendMessage(&pgproto3.BackendKeyData{ProcessID: 0, SecretKey: 0}),
 				pgmock.SendMessage(&pgproto3.ReadyForQuery{TxStatus: 'I'}),
 			}, steps...),
@@ -40,9 +48,9 @@ func testDatabase(t testing.TB, steps ...pgmock.Step) (string, func() error) {
 	go func() {
 		defer close(serverErrChan)
 
-		conn, err := ln.Accept()
-		if err != nil {
-			t.Fatal(err)
+		conn, acceptErr := ln.Accept()
+		if acceptErr != nil {
+			t.Fatal(acceptErr)
 		}
 		defer conn.Close()
 
@@ -58,7 +66,11 @@ func testDatabase(t testing.TB, steps ...pgmock.Step) (string, func() error) {
 	}()
 
 	parts := strings.Split(ln.Addr().String(), ":")
-	return fmt.Sprintf("sslmode=disable prefer_simple_protocol=true host=%s port=%s", parts[0], parts[1]), ln.Close
+	return fmt.Sprintf(
+		"sslmode=disable prefer_simple_protocol=true host=%s port=%s",
+		parts[0],
+		parts[1],
+	), ln.Close
 }
 
 func TestOpen(t *testing.T) {
@@ -66,7 +78,9 @@ func TestOpen(t *testing.T) {
 		is := is.New(t)
 		db, err := Open([]string{"host=127.0.0.1", "host=127.0.0.2", "foobar"})
 
-		is.True(err != nil)                               // expcect error when one config is invalid
+		is.True(
+			err != nil,
+		) // expcect error when one config is invalid
 		is.True(strings.Contains(err.Error(), "index 3")) // there must config index in error
 		is.True(db == nil)                                // db must be nil
 	})
@@ -126,11 +140,11 @@ func TestClose(t *testing.T) {
 		is.Equal(len(db.pdbs), 3) // must be 3 connections
 		db.Close()
 
-		err = db.Ping(context.Background())
+		err = db.Ping(t.Context())
 		is.True(err != nil)
-		merr, ok := err.(*multierror.Error)
-		is.True(ok)             // error must be multierr
-		is.Equal(merr.Len(), 3) // all 3 db must return ping error
+		var merr *multierror.Error
+		is.True(errors.As(err, &merr)) // error must be multierr
+		is.Equal(merr.Len(), 3)        // all 3 db must return ping error
 		for _, v := range merr.Errors {
 			is.True(strings.Contains(v.Error(), "closed pool"))
 		}

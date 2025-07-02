@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -21,13 +19,10 @@ import (
 )
 
 func TestQuerier(t *testing.T) {
-	if strings.Contains(os.Getenv("OS"), "macos") {
-		t.Skip("not supported on mac os runner")
-	}
-
+	t.Parallel()
 	var (
 		db          *pgxpool.Pool
-		databaseUrl string
+		databaseDSN string
 	)
 	{
 		// uses a sensible default on windows (tcp/http) and linux/osx (socket)
@@ -39,7 +34,7 @@ func TestQuerier(t *testing.T) {
 
 			t.Fatalf("Could not connect to docker: %s", err)
 		}
-		if _, err := pool.Client.Info(); err != nil {
+		if _, err = pool.Client.Info(); err != nil {
 			if errors.Is(err, docker.ErrConnectionRefused) {
 				t.Skip("docker not running")
 			}
@@ -64,32 +59,32 @@ func TestQuerier(t *testing.T) {
 			t.Fatalf("Could not start resource: %s", err)
 		}
 
-		databaseUrl = fmt.Sprintf("postgres://user_name:secret@%s/test?sslmode=disable", resource.GetHostPort("5432/tcp"))
+		databaseDSN = fmt.Sprintf("postgres://user_name:secret@%s/test?sslmode=disable", resource.GetHostPort("5432/tcp"))
 
-		t.Logf("Connecting to database on url: %s", databaseUrl)
+		t.Logf("Connecting to database on url: %s", databaseDSN)
 
 		resource.Expire(120) // Tell docker to hard kill the container in 120 seconds
 
 		// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
 		pool.MaxWait = 120 * time.Second
 		if err = pool.Retry(func() error {
-			db, err = pgxpool.Connect(context.Background(), databaseUrl)
+			db, err = pgxpool.Connect(t.Context(), databaseDSN)
 			if err != nil {
 				return err
 			}
-			return db.Ping(context.Background())
+			return db.Ping(t.Context())
 		}); err != nil {
 			t.Fatalf("Could not connect to postgres: %s", err)
 		}
 
 		t.Cleanup(func() {
-			if err := pool.Purge(resource); err != nil {
+			if err = pool.Purge(resource); err != nil {
 				t.Fatalf("Could not purge resource: %s", err)
 			}
 		})
 	}
 
-	tableSql := `create table if not exists %s
+	tableSQL := `create table if not exists %s
 (
     id        serial primary key,
     t_zone    timestamptz,
@@ -112,33 +107,33 @@ func TestQuerier(t *testing.T) {
 		ID           int             `db:"id"`
 		TimeWithZone time.Time       `db:"t_zone"`
 		Time         time.Time       `db:"t"`
-		Json         foobar          `db:"json"`
-		JsonB        foobar          `db:"jsonb"`
-		JsonText     json.RawMessage `db:"json_text"`
+		JSON         foobar          `db:"json"`
+		JSONB        foobar          `db:"jsonb"`
+		JSONText     json.RawMessage `db:"json_text"`
 		String       string          `db:"str"`
 		Slice        []string        `db:"slice"`
 		Float        float64         `db:"float"`
 		Int          int             `db:"int"`
 	}
 
-	loc, err := time.LoadLocation("Europe/Moscow")
-	if err != nil {
-		t.Fatalf("failed to load time location: %s", err)
+	loc, locErr := time.LoadLocation("Europe/Moscow")
+	if locErr != nil {
+		t.Fatalf("failed to load time location: %s", locErr)
 	}
 
 	now := time.Now().Round(time.Second)
 	testRow := row{
 		TimeWithZone: now.In(loc),
 		Time:         now.UTC(),
-		Json: foobar{
+		JSON: foobar{
 			Foo: "foo",
 			Bar: "bar",
 		},
-		JsonB: foobar{
+		JSONB: foobar{
 			Foo: "foo",
 			Bar: "bar",
 		},
-		JsonText: []byte(`{"foo": "foo", "bar": "bar"}`),
+		JSONText: []byte(`{"foo": "foo", "bar": "bar"}`),
 		String:   "foo",
 		Slice:    []string{"foo", "bar"},
 		Float:    3.14,
@@ -148,19 +143,18 @@ func TestQuerier(t *testing.T) {
 	t.Run("Get", func(t *testing.T) {
 		t.Parallel()
 		is := is.New(t)
-		ctx := context.Background()
 
 		querier := WrapConn(db, pgxscan.DefaultAPI)
 		tblName := "test_get"
-		_, err := querier.Exec(ctx, fmt.Sprintf(tableSql, tblName))
-		is.NoErr(err) // table creation
+		_, execErr := querier.Exec(t.Context(), fmt.Sprintf(tableSQL, tblName))
+		is.NoErr(execErr) // table creation
 		t.Cleanup(func() {
-			_, err := querier.Exec(ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s`, tblName))
+			_, err := querier.Exec(context.Background(), fmt.Sprintf(`DROP TABLE IF EXISTS %s`, tblName)) //nolint: usetesting
 			is.NoErr(err)
 		})
 
 		_ = testRow
-		insertSql := fmt.Sprintf(`
+		insertSQL := fmt.Sprintf(`
     INSERT INTO %s (t_zone, t, slice, json, jsonb, json_text, str, float, int)
     VALUES (
       $1,
@@ -174,22 +168,22 @@ func TestQuerier(t *testing.T) {
       $9
      )
     `, tblName)
-		n, err := querier.Exec(ctx, insertSql,
+		n, execErr := querier.Exec(t.Context(), insertSQL,
 			testRow.TimeWithZone,
 			testRow.Time,
 			testRow.Slice,
-			testRow.Json,
-			testRow.JsonB,
-			string(testRow.JsonText),
+			testRow.JSON,
+			testRow.JSONB,
+			string(testRow.JSONText),
 			testRow.String,
 			testRow.Float,
 			testRow.Int,
 		)
-		is.NoErr(err)   // insert row
-		is.True(n == 1) // row inserted
+		is.NoErr(execErr) // insert row
+		is.True(n == 1)   // row inserted
 
 		var got row
-		is.NoErr(querier.Get(ctx, &got, fmt.Sprintf("SELECT * FROM %s LIMIT 1", tblName)))
+		is.NoErr(querier.Get(t.Context(), &got, fmt.Sprintf("SELECT * FROM %s LIMIT 1", tblName)))
 		if diff := cmp.Diff(testRow, got, cmpopts.IgnoreFields(row{}, "ID")); diff != "" {
 			t.Errorf("querier.Get() mismatch (-want +got):\n%s", diff)
 		}
@@ -198,19 +192,18 @@ func TestQuerier(t *testing.T) {
 	t.Run("Select", func(t *testing.T) {
 		t.Parallel()
 		is := is.New(t)
-		ctx := context.Background()
 
 		querier := WrapConn(db, pgxscan.DefaultAPI)
 		tblName := "test_select"
-		_, err := querier.Exec(ctx, fmt.Sprintf(tableSql, tblName))
+		_, err := querier.Exec(t.Context(), fmt.Sprintf(tableSQL, tblName))
 		is.NoErr(err) // table creation
 		t.Cleanup(func() {
-			_, err := querier.Exec(ctx, fmt.Sprintf(`DROP TABLE IF EXISTS %s`, tblName))
+			_, err = querier.Exec(context.Background(), fmt.Sprintf(`DROP TABLE IF EXISTS %s`, tblName)) //nolint: usetesting
 			is.NoErr(err)
 		})
 
 		_ = testRow
-		insertSql := fmt.Sprintf(`
+		insertSQL := fmt.Sprintf(`
     INSERT INTO %s (t_zone, t, slice, json, jsonb, json_text, str, float, int)
     VALUES (
       $1,
@@ -224,24 +217,24 @@ func TestQuerier(t *testing.T) {
       $9
      )
     `, tblName)
-		for i := 0; i < 5; i++ {
-			n, err := querier.Exec(ctx, insertSql,
+		for range 5 {
+			n, execErr := querier.Exec(t.Context(), insertSQL,
 				testRow.TimeWithZone,
 				testRow.Time,
 				testRow.Slice,
-				testRow.Json,
-				testRow.JsonB,
-				string(testRow.JsonText),
+				testRow.JSON,
+				testRow.JSONB,
+				string(testRow.JSONText),
 				testRow.String,
 				testRow.Float,
 				testRow.Int,
 			)
-			is.NoErr(err)   // insert row
-			is.True(n == 1) // row inserted
+			is.NoErr(execErr) // insert row
+			is.True(n == 1)   // row inserted
 		}
 
 		var got []row
-		is.NoErr(querier.Select(ctx, &got, fmt.Sprintf("SELECT * FROM %s", tblName)))
+		is.NoErr(querier.Select(t.Context(), &got, fmt.Sprintf("SELECT * FROM %s", tblName)))
 		for i, v := range got {
 			is.Equal(v.ID, i+1)
 			if diff := cmp.Diff(testRow, v, cmpopts.IgnoreFields(row{}, "ID")); diff != "" {
@@ -253,14 +246,14 @@ func TestQuerier(t *testing.T) {
 	t.Run("Tx", func(t *testing.T) {
 		t.Parallel()
 		is := is.New(t)
-		ctx := context.Background()
 
 		querier := WrapConn(db, pgxscan.DefaultAPI)
 
 		t.Run("TransactionTimeout", func(t *testing.T) {
+			t.Parallel()
 			is := is.New(t)
 
-			err := querier.Tx(ctx, func(_ Querier) error {
+			err := querier.Tx(t.Context(), func(_ Querier) error {
 				time.Sleep(100 * time.Millisecond)
 				return nil
 			}, TransactionTimeout(50*time.Millisecond))
@@ -272,12 +265,13 @@ func TestQuerier(t *testing.T) {
 		})
 
 		t.Run("StatementTimeout", func(t *testing.T) {
+			t.Parallel()
 			is := is.New(t)
 
 			start := time.Now()
-			err := querier.Tx(ctx, func(q Querier) error {
-				_, err := q.Exec(ctx, "SELECT pg_sleep(1)")
-				return err
+			err := querier.Tx(t.Context(), func(q Querier) error {
+				_, execErr := q.Exec(t.Context(), "SELECT pg_sleep(1)")
+				return execErr
 			}, StatementTimeout(50*time.Millisecond))
 
 			is.True(time.Since(start) < 100*time.Millisecond)
@@ -293,19 +287,20 @@ func TestQuerier(t *testing.T) {
 		querier := WrapConn(db, pgxscan.DefaultAPI)
 
 		t.Run("no transaction in ctx", func(t *testing.T) {
+			t.Parallel()
 			is := is.New(t)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			conn := querier.Conn(ctx)
 			is.True(conn == db) // must be original database connection
 		})
 
 		t.Run("transaction in ctx", func(t *testing.T) {
+			t.Parallel()
 			is := is.New(t)
-			ctx := context.Background()
-			tx, err := querier.Conn(ctx).Begin(ctx)
-			is.NoErr(err)
-			ctx = NewTxContext(ctx, tx)
+			tx, txErr := querier.Conn(t.Context()).Begin(t.Context())
+			is.NoErr(txErr)
+			ctx := NewTxContext(t.Context(), tx)
 			conn := querier.Conn(ctx)
 			is.True(conn == tx) // must be transaction connection
 		})

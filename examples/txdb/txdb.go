@@ -1,8 +1,9 @@
-package txdb
+package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/MrEhbr/pgxext/cluster"
@@ -10,6 +11,8 @@ import (
 )
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
 	// The first DSN is assumed to be the primary and all
 	// other to be replica
 	dsns := []string{
@@ -20,22 +23,29 @@ func main() {
 
 	db, err := cluster.Open(dsns)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to open cluster", "error", err)
+		os.Exit(1)
 	}
 
 	txdb := txdb.New(db)
-	defer txdb.Close()
 
 	ctx := context.Background()
 	pingCtx, pingCancel := context.WithTimeout(ctx, time.Second)
-	defer pingCancel()
 
-	if err := db.Ping(pingCtx); err != nil {
-		log.Fatalf("Some databases is unreachable: %s", err)
+	if pingErr := db.Ping(pingCtx); pingErr != nil {
+		logger.Error("Some databases is unreachable", "error", pingErr)
+		_ = txdb.Close()
+		pingCancel()
+
+		os.Exit(1)
 	}
 
 	_, err = db.Exec(ctx, `INSERT INTO foo(bar) VALUES("baz")`)
 	if err != nil {
-		log.Fatalf("failed to insert: %s", err)
+		logger.Error("failed to insert", "error", err)
+		_ = txdb.Close()
+		pingCancel()
+
+		os.Exit(1)
 	}
 }

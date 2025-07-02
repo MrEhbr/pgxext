@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/MrEhbr/pgxext/cluster"
@@ -17,18 +18,22 @@ func main() {
 		"postgres://user:secret@replica-02:5432/mydb",
 	}
 
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
 	db, err := cluster.Open(dsns)
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to open cluster", "error", err)
+		os.Exit(1)
 	}
 
 	ctx := context.Background()
 
 	pingCtx, pingCancel := context.WithTimeout(ctx, time.Second)
-	defer pingCancel()
 
-	if err := db.Ping(pingCtx); err != nil {
-		log.Fatalf("Some databases is unreachable: %s", err)
+	if pingErr := db.Ping(pingCtx); pingErr != nil {
+		logger.Error("Some databases is unreachable", "error", pingErr)
+		pingCancel()
+		os.Exit(1)
 	}
 
 	// Read queries are directed to replica with Get and Select.
@@ -37,14 +42,16 @@ func main() {
 	var count int
 	err = db.Get(ctx, &count, "SELECT COUNT(*) FROM table")
 	if err != nil {
-		log.Fatalf("failed to get: %s", err)
+		logger.Error("failed to get", "error", err)
+		os.Exit(1)
 	}
 
 	// Write queries are directed to the primary with Exec.
 	// Always use Exec for INSERTS, UPDATES
 	_, err = db.Exec(ctx, "UPDATE table SET something = 1")
 	if err != nil {
-		log.Fatalf("failed to update: %s", err)
+		logger.Error("failed to update", "error", err)
+		os.Exit(1)
 	}
 
 	// If needed, one can access the PgxConn to call pgx methods directly such as SendBatch, CopyFrom ... .

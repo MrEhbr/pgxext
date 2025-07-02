@@ -1,11 +1,8 @@
 package txdb
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -17,23 +14,20 @@ import (
 )
 
 func TestIntegration_txdb(t *testing.T) {
-	if strings.Contains(os.Getenv("OS"), "macos") {
-		t.Skip("not supported on mac os runner")
-	}
-
+	t.Parallel()
 	var (
 		db          *cluster.Cluster
-		databaseUrl string
+		databaseDSN string
 	)
 	{
 		// uses a sensible default on windows (tcp/http) and linux/osx (socket)
-		pool, err := dockertest.NewPool("")
-		if err != nil {
-			if errors.Is(err, docker.ErrInvalidEndpoint) {
+		pool, poolErr := dockertest.NewPool("")
+		if poolErr != nil {
+			if errors.Is(poolErr, docker.ErrInvalidEndpoint) {
 				t.Skip("docker endpoint not found")
 			}
 
-			t.Fatalf("Could not connect to docker: %s", err)
+			t.Fatalf("Could not connect to docker: %s", poolErr)
 		}
 		if _, err := pool.Client.Info(); err != nil {
 			if errors.Is(err, docker.ErrConnectionRefused) {
@@ -44,7 +38,7 @@ func TestIntegration_txdb(t *testing.T) {
 		// pulls an image, creates a container based on it and runs it
 		resource, err := pool.RunWithOptions(&dockertest.RunOptions{
 			Repository: "postgres",
-			Tag:        "11",
+			Tag:        "17-alpine",
 			Env: []string{
 				"POSTGRES_PASSWORD=secret",
 				"POSTGRES_USER=user_name",
@@ -60,40 +54,39 @@ func TestIntegration_txdb(t *testing.T) {
 			t.Fatalf("Could not start resource: %s", err)
 		}
 
-		databaseUrl = fmt.Sprintf("postgres://user_name:secret@%s/test?sslmode=disable", resource.GetHostPort("5432/tcp"))
+		databaseDSN = fmt.Sprintf("postgres://user_name:secret@%s/test?sslmode=disable", resource.GetHostPort("5432/tcp"))
 
-		t.Logf("Connecting to database on url: %s", databaseUrl)
+		t.Logf("Connecting to database on url: %s", databaseDSN)
 
 		resource.Expire(120) // Tell docker to hard kill the container in 120 seconds
 
 		// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
 		pool.MaxWait = 120 * time.Second
 		if err = pool.Retry(func() error {
-			db, err = cluster.Open([]string{databaseUrl})
+			db, err = cluster.Open([]string{databaseDSN})
 			if err != nil {
 				return err
 			}
-			return db.Ping(context.Background())
+			return db.Ping(t.Context())
 		}); err != nil {
 			t.Fatalf("Could not connect to postgres: %s", err)
 		}
 
 		t.Cleanup(func() {
-			if err := pool.Purge(resource); err != nil {
+			if err = pool.Purge(resource); err != nil {
 				t.Fatalf("Could not purge resource: %s", err)
 			}
 		})
 	}
 	t.Run("New", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 		is := is.New(t)
 
 		sendBatch := func(conn conn.PgxConn) (time.Time, time.Time) {
 			var t1, t2 time.Time
-			is.NoErr(conn.QueryRow(ctx, "SELECT transaction_timestamp()").Scan(&t1))
+			is.NoErr(conn.QueryRow(t.Context(), "SELECT transaction_timestamp()").Scan(&t1))
 			time.Sleep(100 * time.Millisecond)
-			is.NoErr(conn.QueryRow(ctx, "SELECT transaction_timestamp()").Scan(&t2))
+			is.NoErr(conn.QueryRow(t.Context(), "SELECT transaction_timestamp()").Scan(&t2))
 
 			return t1, t2
 		}
@@ -102,22 +95,21 @@ func TestIntegration_txdb(t *testing.T) {
 			t.Parallel()
 			is := is.New(t)
 
-			t1, t2 := sendBatch(db.Primary().Conn(ctx))
+			t1, t2 := sendBatch(db.Primary().Conn(t.Context()))
 			is.True(!t1.Equal(t2)) // transaction_timestamp not in transaction must be not equal
 
 			txdb := New(db)
 
-			t1, t2 = sendBatch(txdb.Primary().Conn(ctx))
+			t1, t2 = sendBatch(txdb.Primary().Conn(t.Context()))
 			is.True(t1.Equal(t2)) // transaction_timestamp in transaction must be equal
 		})
 	})
 
 	t.Run("Rollback", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 		is := is.New(t)
 
-		_, err := db.Exec(ctx, `CREATE TABLE IF NOT EXISTS test(name TEXT)`)
+		_, err := db.Exec(t.Context(), `CREATE TABLE IF NOT EXISTS test(name TEXT)`)
 		is.NoErr(err)
 
 		t.Run("check that all changes to table rolled back", func(t *testing.T) {
@@ -126,90 +118,90 @@ func TestIntegration_txdb(t *testing.T) {
 
 			txdb := New(db)
 			t.Cleanup(func() {
-				txdb.Rollback(context.Background())
+				txdb.Rollback(t.Context())
 			})
 
 			name := "foo"
-			_, err = txdb.Exec(ctx, `INSERT INTO test(name) VALUES($1)`, name)
+			_, err = txdb.Exec(t.Context(), `INSERT INTO test(name) VALUES($1)`, name)
 			is.NoErr(err)
 			var exists bool
-			is.NoErr(txdb.Get(ctx, &exists, `SELECT COUNT(1) > 0 FROM test WHERE name = $1`, name))
+			is.NoErr(txdb.Get(t.Context(), &exists, `SELECT COUNT(1) > 0 FROM test WHERE name = $1`, name))
 			is.True(exists)
-			is.NoErr(txdb.Rollback(ctx))
+			is.NoErr(txdb.Rollback(t.Context()))
 
-			is.NoErr(db.Get(ctx, &exists, `SELECT COUNT(1) > 0 FROM test WHERE name = $1`, name))
+			is.NoErr(db.Get(t.Context(), &exists, `SELECT COUNT(1) > 0 FROM test WHERE name = $1`, name))
 			is.True(!exists)
 		})
 	})
 
 	t.Run("Close", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 		is := is.New(t)
 
-		_, err := db.Exec(ctx, `CREATE TABLE IF NOT EXISTS test_close(name TEXT)`)
+		_, err := db.Exec(t.Context(), `CREATE TABLE IF NOT EXISTS test_close(name TEXT)`)
 		is.NoErr(err)
 
 		t.Run("check that close rolledback changes", func(t *testing.T) {
 			t.Parallel()
 			is := is.New(t)
 
-			tdb, err := cluster.Open([]string{databaseUrl})
-			is.NoErr(err)
+			tdb, openErr := cluster.Open([]string{databaseDSN})
+			is.NoErr(openErr)
 			txdb := New(tdb)
 
 			t.Cleanup(func() {
-				txdb.Rollback(context.Background())
+				txdb.Rollback(t.Context())
 			})
 
 			name := "foo"
-			_, err = txdb.Exec(ctx, `INSERT INTO test_close(name) VALUES($1)`, name)
+			_, err = txdb.Exec(t.Context(), `INSERT INTO test_close(name) VALUES($1)`, name)
 			is.NoErr(err)
 			var exists bool
-			is.NoErr(txdb.Get(ctx, &exists, `SELECT COUNT(1) > 0 FROM test_close WHERE name = $1`, name))
+			is.NoErr(txdb.Get(t.Context(), &exists, `SELECT COUNT(1) > 0 FROM test_close WHERE name = $1`, name))
 			is.True(exists)
 			is.NoErr(txdb.Close())
 
-			tdb, err = cluster.Open([]string{databaseUrl})
+			tdb, err = cluster.Open([]string{databaseDSN})
 			is.NoErr(err)
 
 			defer tdb.Close()
 
-			is.NoErr(tdb.Get(ctx, &exists, `SELECT COUNT(1) > 0 FROM test_close WHERE name = $1`, name))
+			is.NoErr(tdb.Get(t.Context(), &exists, `SELECT COUNT(1) > 0 FROM test_close WHERE name = $1`, name))
 			is.True(!exists)
 		})
 	})
 
 	t.Run("check nested transactions", func(t *testing.T) {
 		t.Parallel()
-		ctx := context.Background()
 		is := is.New(t)
 
 		txdb := New(db)
 
-		_, err := db.Exec(ctx, `CREATE TABLE IF NOT EXISTS test_nested(name TEXT)`)
+		_, err := db.Exec(t.Context(), `CREATE TABLE IF NOT EXISTS test_nested(name TEXT)`)
 		is.NoErr(err)
 
 		foo, bar := "foo", "bar"
-		_, err = txdb.Exec(ctx, `INSERT INTO test_nested(name) VALUES($1)`, foo)
+		_, err = txdb.Exec(t.Context(), `INSERT INTO test_nested(name) VALUES($1)`, foo)
 		is.NoErr(err)
-		var exists bool
-		is.NoErr(txdb.Get(ctx, &exists, `SELECT COUNT(1) > 0 FROM test_nested WHERE name = $1`, foo))
-		is.True(exists)
+		var existsFooFirst bool
+		is.NoErr(txdb.Get(t.Context(), &existsFooFirst, `SELECT COUNT(1) > 0 FROM test_nested WHERE name = $1`, foo))
+		is.True(existsFooFirst)
 
-		txdb.Tx(ctx, func(q conn.Querier) error {
-			_, err := q.Exec(ctx, `INSERT INTO test_nested(name) VALUES($1)`, bar)
+		txdb.Tx(t.Context(), func(q conn.Querier) error {
+			_, err = q.Exec(t.Context(), `INSERT INTO test_nested(name) VALUES($1)`, bar)
 			is.NoErr(err)
 			var exists bool
-			is.NoErr(q.Get(ctx, &exists, `SELECT COUNT(1) > 0 FROM test_nested WHERE name = $1`, bar))
+			is.NoErr(q.Get(t.Context(), &exists, `SELECT COUNT(1) > 0 FROM test_nested WHERE name = $1`, bar))
 			is.True(exists)
 			return errors.New("rollback")
 		})
 
-		is.NoErr(txdb.Get(ctx, &exists, `SELECT COUNT(1) > 0 FROM test_nested WHERE name = $1`, bar))
-		is.True(!exists)
+		var existsBar bool
+		is.NoErr(txdb.Get(t.Context(), &existsBar, `SELECT COUNT(1) > 0 FROM test_nested WHERE name = $1`, bar))
+		is.True(!existsBar)
 
-		is.NoErr(txdb.Get(ctx, &exists, `SELECT COUNT(1) > 0 FROM test_nested WHERE name = $1`, foo))
-		is.True(exists)
+		var existsFoo bool
+		is.NoErr(txdb.Get(t.Context(), &existsFoo, `SELECT COUNT(1) > 0 FROM test_nested WHERE name = $1`, foo))
+		is.True(existsFoo)
 	})
 }

@@ -11,7 +11,7 @@ type Options struct {
 // Option func.
 type Option func(*Options)
 
-// WithConnPicker sets connection picker for Select and Get
+// WithConnPicker sets connection picker for Select and Get.
 func WithConnPicker(picker ConnPicker) Option {
 	return func(o *Options) {
 		if picker != nil {
@@ -20,7 +20,7 @@ func WithConnPicker(picker ConnPicker) Option {
 	}
 }
 
-// WithConnPicker sets custom pgxscan api
+// WithScanAPI sets custom pgxscan api.
 func WithScanAPI(api *pgxscan.API) Option {
 	return func(o *Options) {
 		if api != nil {

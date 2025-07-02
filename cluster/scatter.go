@@ -5,8 +5,7 @@ import "github.com/hashicorp/go-multierror"
 func scatter(n int, fn func(i int) error) error {
 	errors := make(chan error, n)
 
-	var i int
-	for i = 0; i < n; i++ {
+	for i := range n {
 		go func(i int) { errors <- fn(i) }(i)
 	}
 
@@ -14,7 +13,7 @@ func scatter(n int, fn func(i int) error) error {
 		errs     *multierror.Error
 		innerErr error
 	)
-	for i = 0; i < cap(errors); i++ {
+	for range cap(errors) {
 		if innerErr = <-errors; innerErr != nil {
 			errs = multierror.Append(errs, innerErr)
 		}

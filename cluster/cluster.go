@@ -136,7 +136,7 @@ func (conn *Cluster) Tx(ctx context.Context, f func(n conn.Querier) error, opts 
 	return conn.Primary().Tx(ctx, f, opts...)
 }
 
-// Primary returns the primary physical database
+// Primary returns the primary physical database.
 func (conn *Cluster) Primary() conn.Querier {
 	return conn.pdbs[0].querier
 }
@@ -150,7 +150,7 @@ func (conn *Cluster) replica(n int) int {
 	if n <= 1 {
 		return 0
 	}
-	return int(1 + (atomic.AddUint64(&conn.count, 1) % uint64(n-1)))
+	return int(1 + (atomic.AddUint64(&conn.count, 1) % uint64(n-1))) //nolint: gosec // It's not possible to overflow here.
 }
 
 func (conn *Cluster) ScanAPI() *pgxscan.API {
