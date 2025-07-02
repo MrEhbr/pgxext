@@ -17,9 +17,9 @@ var (
 type (
 	PgxConn interface {
 		Begin(context.Context) (pgx.Tx, error)
-		Exec(ctx context.Context, sql string, arguments ...interface{}) (pgconn.CommandTag, error)
-		Query(ctx context.Context, sql string, optionsAndArgs ...interface{}) (pgx.Rows, error)
-		QueryRow(ctx context.Context, sql string, optionsAndArgs ...interface{}) pgx.Row
+		Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+		Query(ctx context.Context, sql string, optionsAndArgs ...any) (pgx.Rows, error)
+		QueryRow(ctx context.Context, sql string, optionsAndArgs ...any) pgx.Row
 		SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
 		CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error)
 	}

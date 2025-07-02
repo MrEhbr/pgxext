@@ -15,9 +15,9 @@ type (
 	// forming a single primary multiple replica topology.
 	// Reads(Get, Select) and writes(Exec, Tx) are automatically directed to the correct physical db.
 	Conn interface {
-		Select(ctx context.Context, dst interface{}, sql string, args ...interface{}) error
-		Get(ctx context.Context, dst interface{}, sql string, args ...interface{}) error
-		Exec(ctx context.Context, sql string, args ...interface{}) (int64, error)
+		Select(ctx context.Context, dst any, sql string, args ...any) error
+		Get(ctx context.Context, dst any, sql string, args ...any) error
+		Exec(ctx context.Context, sql string, args ...any) (int64, error)
 		Tx(ctx context.Context, f func(n conn.Querier) error, opts ...conn.TxOption) error
 		Primary() conn.Querier
 		Replica() conn.Querier
@@ -114,19 +114,19 @@ func (conn *Cluster) Ping(ctx context.Context) error {
 // Select multiple records.
 // Select uses a replica by default.
 // See Querier.Select for details.
-func (conn *Cluster) Select(ctx context.Context, dst interface{}, sql string, args ...interface{}) error {
+func (conn *Cluster) Select(ctx context.Context, dst any, sql string, args ...any) error {
 	return conn.picker(conn, sql).Select(ctx, dst, sql, args...)
 }
 
 // Get retriave one row.
 // Get uses a replica by default.
 // See Querier.Get for details.
-func (conn *Cluster) Get(ctx context.Context, dst interface{}, sql string, args ...interface{}) error {
+func (conn *Cluster) Get(ctx context.Context, dst any, sql string, args ...any) error {
 	return conn.picker(conn, sql).Get(ctx, dst, sql, args...)
 }
 
 // Exec executes a query on primary without returning any rows and return affected rows.
-func (conn *Cluster) Exec(ctx context.Context, sql string, args ...interface{}) (int64, error) {
+func (conn *Cluster) Exec(ctx context.Context, sql string, args ...any) (int64, error) {
 	return conn.Primary().Exec(ctx, sql, args...)
 }
 

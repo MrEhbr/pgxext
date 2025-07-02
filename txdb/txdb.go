@@ -62,7 +62,7 @@ func (c *txdbCluster) Ping(ctx context.Context) error {
 	return c.cluster.Ping(ctx)
 }
 
-func (c *txdbCluster) Select(ctx context.Context, dst interface{}, sql string, args ...interface{}) error {
+func (c *txdbCluster) Select(ctx context.Context, dst any, sql string, args ...any) error {
 	c.txLock.Lock()
 	defer c.txLock.Unlock()
 
@@ -73,7 +73,7 @@ func (c *txdbCluster) Select(ctx context.Context, dst interface{}, sql string, a
 	return conn.WrapConn(tx, c.scanAPI).Select(ctx, dst, sql, args...)
 }
 
-func (c *txdbCluster) Get(ctx context.Context, dst interface{}, sql string, args ...interface{}) error {
+func (c *txdbCluster) Get(ctx context.Context, dst any, sql string, args ...any) error {
 	c.txLock.Lock()
 	defer c.txLock.Unlock()
 
@@ -103,7 +103,7 @@ func (c *txdbCluster) Begin(ctx context.Context) (pgx.Tx, error) {
 	return c.beginOnce(ctx)
 }
 
-func (c *txdbCluster) Exec(ctx context.Context, sql string, args ...interface{}) (int64, error) {
+func (c *txdbCluster) Exec(ctx context.Context, sql string, args ...any) (int64, error) {
 	c.txLock.Lock()
 	defer c.txLock.Unlock()
 
