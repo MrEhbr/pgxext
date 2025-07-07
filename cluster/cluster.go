@@ -79,7 +79,7 @@ func NewFromConfigs(config []*pgxpool.Config, opts ...Option) (*Cluster, error) 
 	err := scatter(len(db.pdbs), func(i int) error {
 		c, err := pgxpool.NewWithConfig(context.Background(), config[i])
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create connection pool %d: %w", i, err)
 		}
 
 		db.pdbs[i] = &pdb{
@@ -89,7 +89,7 @@ func NewFromConfigs(config []*pgxpool.Config, opts ...Option) (*Cluster, error) 
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize cluster connections: %w", err)
 	}
 
 	return db, nil
@@ -118,7 +118,7 @@ func (conn *Cluster) Select(ctx context.Context, dst any, sql string, args ...an
 	return conn.picker(conn, sql).Select(ctx, dst, sql, args...)
 }
 
-// Get retriave one row.
+// Get retrieve one row.
 // Get uses a replica by default.
 // See Querier.Get for details.
 func (conn *Cluster) Get(ctx context.Context, dst any, sql string, args ...any) error {

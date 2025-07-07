@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -35,24 +36,17 @@ func StatementTimeout(d time.Duration) TxOption {
 	}
 }
 
-// Context options for transaction
-
-type txKeyType uint8
-
-const (
-	txKey txKeyType = 0
-)
-
-// NewTxContext returns a new context carrying the transaction connection.
-func NewTxContext(ctx context.Context, tx pgx.Tx) context.Context {
-	if tx == nil {
-		return ctx
+// Apply applies the timeout configuration to the given transaction.
+func (opts *TxOptions) Apply(ctx context.Context, tx pgx.Tx) error {
+	if opts.TransactionTimeout > 0 {
+		if _, err := tx.Exec(ctx, transactionTimeoutQuery, pgx.QueryExecModeSimpleProtocol, opts.TransactionTimeout); err != nil {
+			return fmt.Errorf("set transaction timeout: %w", err)
+		}
 	}
-	return context.WithValue(ctx, txKey, tx)
-}
-
-// TxFromContext extracts the transaction connection if present.
-func TxFromContext(ctx context.Context) (pgx.Tx, bool) {
-	v, ok := ctx.Value(txKey).(pgx.Tx)
-	return v, ok
+	if opts.StatementTimeout > 0 {
+		if _, err := tx.Exec(ctx, statementTimeoutQuery, pgx.QueryExecModeSimpleProtocol, opts.StatementTimeout); err != nil {
+			return fmt.Errorf("set statement timeout: %w", err)
+		}
+	}
+	return nil
 }

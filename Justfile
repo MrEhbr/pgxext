@@ -16,7 +16,7 @@ test target="./..." *opts="-v -test.timeout=1m -cover":
 
 # Lint code
 lint target="./..." *opts="-v":
-    go tool golangci-lint run {{opts}} {{target}}
+    go tool golangci-lint run --fix {{opts}} {{target}}
 
 # Format code
 fmt target="./...":
@@ -34,4 +34,4 @@ deps:
 # Start development database and export credentials
 dev:
     @if ! docker ps --filter name=pgxext-dev --format "{{{{.Names}}}}" | grep -q pgxext-dev; then docker run --rm -d --name pgxext-dev -e POSTGRES_PASSWORD=dev -p 5433:5432 postgres:17; fi
-    @echo "export TEST_DATABASE_DSN=\"postgres://postgres:dev@localhost:5433/postgres?sslmode=disable\""
+    @echo "export PGXEXT_TEST_DATABASE_DSN=\"postgres://postgres:dev@localhost:5433/postgres?sslmode=disable\""
