@@ -24,6 +24,8 @@
 
             # https://github.com/golangci/golangci-lint
             golangci-lint
+
+            wrkflw # run GitHub workflows locally
           ];
         };
       });

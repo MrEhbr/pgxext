@@ -12,7 +12,7 @@ generate target="./...":
 
 # Run tests
 test target="./..." *opts="-v -test.timeout=1m -cover":
-    go tool gotestsum --format-hide-empty-pkg -- -race {{target}} {{opts}}
+    CGO_ENABLED=1 go tool gotestsum --format-hide-empty-pkg -- -race {{target}} {{opts}}
 
 # Lint code
 lint target="./..." *opts="-v":
