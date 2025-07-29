@@ -1,6 +1,6 @@
 # pgxext
 
-[![Go](https://github.com/MrEhbr/pgxext/actions/workflows/go.yml/badge.svg)](https://github.com/MrEhbr/pgxext/actions/workflows/go.yml)
+[![CI](https://github.com/MrEhbr/pgxext/actions/workflows/ci.yml/badge.svg)](https://github.com/MrEhbr/pgxext/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/MrEhbr/pgxext/blob/main/COPYRIGHT)
 [![Go Report Card](https://goreportcard.com/badge/github.com/MrEhbr/pgxext)](https://goreportcard.com/report/github.com/MrEhbr/pgxext)
 [![GoDoc](https://godoc.org/github.com/MrEhbr/pgxext?status.svg)](https://godoc.org/github.com/MrEhbr/pgxext)
