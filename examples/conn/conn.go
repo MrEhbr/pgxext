@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/MrEhbr/pgxext/conn"
+	"github.com/MrEhbr/pgxext/v2/conn"
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

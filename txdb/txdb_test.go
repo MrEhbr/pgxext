@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/MrEhbr/pgxext/cluster"
-	"github.com/MrEhbr/pgxext/conn"
+	"github.com/MrEhbr/pgxext/v2/cluster"
+	"github.com/MrEhbr/pgxext/v2/conn"
 	"github.com/jackc/pgx/v5"
 	"github.com/matryer/is"
 )

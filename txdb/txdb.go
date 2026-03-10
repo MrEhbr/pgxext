@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/MrEhbr/pgxext/cluster"
-	"github.com/MrEhbr/pgxext/conn"
+	"github.com/MrEhbr/pgxext/v2/cluster"
+	"github.com/MrEhbr/pgxext/v2/conn"
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/jackc/pgx/v5"
 )

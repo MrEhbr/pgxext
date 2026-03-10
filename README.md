@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/MrEhbr/pgxext/actions/workflows/ci.yml/badge.svg)](https://github.com/MrEhbr/pgxext/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/MrEhbr/pgxext/blob/main/COPYRIGHT)
-[![Go Report Card](https://goreportcard.com/badge/github.com/MrEhbr/pgxext)](https://goreportcard.com/report/github.com/MrEhbr/pgxext)
-[![GoDoc](https://godoc.org/github.com/MrEhbr/pgxext?status.svg)](https://godoc.org/github.com/MrEhbr/pgxext)
+[![Go Report Card](https://goreportcard.com/badge/github.com/MrEhbr/pgxext/v2)](https://goreportcard.com/report/github.com/MrEhbr/pgxext/v2)
+[![GoDoc](https://godoc.org/github.com/MrEhbr/pgxext/v2?status.svg)](https://godoc.org/github.com/MrEhbr/pgxext/v2)
 
 **pgxext** is a comprehensive collection of PostgreSQL extensions for the [pgx](https://github.com/jackc/pgx) v5 driver, designed to simplify database operations, cluster management, and testing workflows.
 
@@ -17,7 +17,7 @@
 ## Installation
 
 ```bash
-go get github.com/MrEhbr/pgxext
+go get github.com/MrEhbr/pgxext/v2
 ```
 
 ## Architecture

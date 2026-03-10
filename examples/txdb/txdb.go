@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/MrEhbr/pgxext/cluster"
-	"github.com/MrEhbr/pgxext/txdb"
+	"github.com/MrEhbr/pgxext/v2/cluster"
+	"github.com/MrEhbr/pgxext/v2/txdb"
 )
 
 func main() {

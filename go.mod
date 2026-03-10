@@ -1,4 +1,4 @@
-module github.com/MrEhbr/pgxext
+module github.com/MrEhbr/pgxext/v2
 
 go 1.24.2
 

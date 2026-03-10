@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/MrEhbr/pgxext/cluster"
+	"github.com/MrEhbr/pgxext/v2/cluster"
 )
 
 func main() {
